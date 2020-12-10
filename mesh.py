@@ -168,7 +168,7 @@ class PointFinder:
         #reversed_tmask = cv2.bitwise_not(tmask)
         #gaps = cv2.bitwise_and(img1, img1, mask=reversed_tmask)
         res_im = cv2.add(gaps, res_im)
-        return res_im
+        return res_im, triangle_mask
 
     def merge_imgs(self, img1, img2):
         return cv2.add(img1, img2)
@@ -176,21 +176,40 @@ class PointFinder:
         # return img1 + img2
 
     def correct_colours(self, im1, im2, landmarks1):
-        blur_amount = config.COLOUR_CORRECT_BLUR_FRAC * numpy.linalg.norm(
-                              numpy.mean(landmarks1[config.LEFT_EYE_POINTS], axis=0) -
-                              numpy.mean(landmarks1[config.RIGHT_EYE_POINTS], axis=0))
-        blur_amount = int(blur_amount)
-        if blur_amount % 2 == 0:
-            blur_amount += 1
+        #blur_amount = config.COLOUR_CORRECT_BLUR_FRAC * numpy.linalg.norm(
+        #                      numpy.mean(landmarks1[config.LEFT_EYE_POINTS], axis=0) -
+        #                      numpy.mean(landmarks1[config.RIGHT_EYE_POINTS], axis=0))
+        #blur_amount = int(blur_amount)
+        #print(blur_amount)
+        #if blur_amount % 2 == 0:
+        #    blur_amount += 1
+        blur_amount = 11
         im1_blur = cv2.GaussianBlur(im1, (blur_amount, blur_amount), 0)
         im2_blur = cv2.GaussianBlur(im2, (blur_amount, blur_amount), 0)
 
+        cv2.imshow("Orig", im1_blur)
+        cv2.imshow("Mask", im2_blur)
+        cv2.waitKey(0)
+
+        im1_gray = cv2.cvtColor(im1_blur, cv2.COLOR_BGR2GRAY)
+        im2_gray = cv2.cvtColor(im2_blur, cv2.COLOR_BGR2GRAY)
+
+        sub = cv2.subtract(im1_gray, im2_gray)
+
+        cv2.imshow("Sub", sub)
+
+        im2 = cv2.add(im2, cv2.merge((sub, sub, sub)))
+
+        cv2.imshow("res", im2)
+        cv2.waitKey(0)
+
         # Avoid divide-by-zero errors.
-        #im2_blur += 128 * (im2_blur <= 1.0)
+        #im2_blur += 128 * 
 
-        return (im2.astype(numpy.float64) * im1_blur.astype(numpy.float64) / im2_blur.astype(numpy.float64))
+        #return (im2.astype(numpy.float64) * im1_blur.astype(numpy.float64) / im2_blur.astype(numpy.float64))
+        return im2
 
-def main():
+def main(*args, **kwargs):
     ptf = PointFinder()
     base_img = cv2.imread(sys.argv[1])
     original_img = cv2.imread(sys.argv[2])
@@ -222,27 +241,30 @@ def main():
     #       xor_img = cv2.bitwise_xor(cloaked_img, original_img) * 255
     #       cv2.imshow("Cloaked", xor_img)
     cv2.waitKey(0)
-    #print("Aligning landmarks...")
-    #M = ptf.align(lm1[config.ALIGN_POINTS], lm2[config.ALIGN_POINTS])
-    #print("Warping mask...")
-    #warped_img = ptf.warp_imgs(cloaked_img, M, base_img.shape)
+    print("Aligning landmarks...")
+    M = ptf.align(lm1[config.ALIGN_POINTS], lm2[config.ALIGN_POINTS])
+    print("Warping mask...")
+    warped_img = ptf.warp_imgs(cloaked_img, M, base_img.shape)
     #       facemask = ptf.warp_imgs(facemask, M, base_img.shape)
     #       reversed_facemask = ptf.warp_imgs(reversed_facemask, M, base_img.shape)
     #cv2.imshow("Warped", warped_img)
     #cv2.waitKey(0)
     #warped_img = cv2.bitwise_and(warped_img, warped_img, mask=facemask)
     print("Generating face mesh transformations...")
-    mesh = ptf.transform_mesh(cv2.bitwise_and(base_img, base_img, mask=facemask), cloaked_img, lm1, lm2)
+    mesh, cmask = ptf.transform_mesh(cv2.bitwise_and(base_img, base_img, mask=facemask), cloaked_img, lm1, lm2)
     cv2.imshow("Mesh", mesh)
     cv2.waitKey(0)
     mesh = cv2.bitwise_and(mesh, mesh, mask=facemask)
     print("Merging result...")
-    base_img = cv2.bitwise_and(base_img, base_img, mask=reversed_facemask)
-    result = ptf.merge_imgs(base_img, mesh)
-    #result = ptf.correct_colours(base_img, mesh, lm1)
+    reversed_facemask = cv2.bitwise_not(facemask)
+    #base_img = cv2.bitwise_and(base_img, base_img, mask=reversed_facemask)
+    #result = ptf.merge_imgs(base_img, mesh)
+    result = ptf.correct_colours(base_img, mesh, lm1)
+    result = ptf.merge_imgs(cv2.bitwise_and(result, result, mask=facemask), cv2.bitwise_and(base_img, base_img, mask=reversed_facemask))
     cv2.imwrite('output.png', result)
     cv2.imshow("Result", result)
     cv2.waitKey(0)
+    return result
 
 
 if __name__ == "__main__":

@@ -3,3 +3,4 @@
 *.jpeg
 *.dat
 *._sync*
+__pycache__
