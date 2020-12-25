@@ -3,6 +3,7 @@ import dlib
 import numpy
 import sys
 import os
+import operator
 
 class Config:
     def __init__(self):
@@ -194,20 +195,63 @@ class PointFinder:
         im1_gray = cv2.cvtColor(im1_blur, cv2.COLOR_BGR2GRAY)
         im2_gray = cv2.cvtColor(im2_blur, cv2.COLOR_BGR2GRAY)
 
-        sub = cv2.subtract(im1_gray, im2_gray)
+        res = numpy.zeros(im2.shape, dtype=im2.dtype)
 
-        cv2.imshow("Sub", sub)
+        rows, cols, _ = im2.shape
 
-        im2 = cv2.add(im2, cv2.merge((sub, sub, sub)))
+        #for i in range(rows):
+            #for j in range(cols):
+                #print(i, j, numpy.take(im2, numpy.array([i, j], dtype=numpy.uint8), axis=0))
+                #delta = im2_gray.item(i, j) - im1_gray.item(i, j)
+        delta = numpy.subtract(im2_gray, im1_gray)
+                #color = list(map(lambda x, y: (lambda i: 255 if i > 255 else i)(x + y), numpy.take(im2, (i, j)), [delta, delta, delta]))
+        m_delta = numpy.expand_dims(delta, axis=2)
 
-        cv2.imshow("res", im2)
-        cv2.waitKey(0)
+        m_delta = numpy.repeat(m_delta, 3, axis=2)
+
+        cv2.imshow("Delta", m_delta)
+
+        color = numpy.add(im2, m_delta)
+
+        #res = numpy.add(im2, color)
+
+        """
+        def process_axis(x):
+            for i in range(len(x)):
+                if x[i] > 255:
+                    x[i] = 255
+                elif x[i] < 0:
+                    x[i] = 0
+
+        res = numpy.apply_along_axis(process_axis, 2, res)
+        """
+        #res = cv2.add(im2, color)
+
+                #print(color)
+                #color_res = numpy.array(color)
+                #for c in range(len(color)):
+                    #print(color_res[0])
+                    #color_res[0, c] = color[c]
+                #print(im2[i][j], color)
+                #for l in range(res[i, j].size):
+                    #print(res.item((i, j)))
+                    #res.itemset((i, j, l), color[l])
+
+
+        #sub = cv2.subtract(im1_gray, im2_gray)
+
+        #cv2.imshow("Sub", sub)
+
+        #im2 = cv2.add(im2, cv2.merge((sub, sub, sub)))
+
+        #cv2.imshow("res", im2)
+        #cv2.waitKey(0)
 
         # Avoid divide-by-zero errors.
         #im2_blur += 128 * 
 
         #return (im2.astype(numpy.float64) * im1_blur.astype(numpy.float64) / im2_blur.astype(numpy.float64))
-        return im2
+        return color
 
 def main(*args, **kwargs):
     ptf = PointFinder()
